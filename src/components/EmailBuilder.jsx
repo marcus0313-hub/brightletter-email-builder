@@ -2217,12 +2217,76 @@ export default function EmailBuilder() {
     });
   }
 
+  function addContentToColumn({ blockId, columnId, sourceBlockId, type }) {
+    commitDesignChange((current) => {
+      const targetBlock = current.blocks.find((block) => block.id === blockId);
+      const sourceBlock = sourceBlockId
+        ? current.blocks.find((block) => block.id === sourceBlockId)
+        : null;
+
+      if (
+        targetBlock?.type !== "columns" ||
+        !Array.isArray(targetBlock.props?.columns) ||
+        (sourceBlockId && !sourceBlock)
+      ) {
+        return current;
+      }
+
+      const content = sourceBlock
+        ? {
+            id: `column-${sourceBlock.type}-${crypto.randomUUID()}`,
+            type: sourceBlock.type,
+            props: JSON.parse(JSON.stringify(sourceBlock.props)),
+          }
+        : createColumnContent(type);
+      const blocks = current.blocks
+        .filter((block) => block.id !== sourceBlockId)
+        .map((block) => {
+          if (block.id !== blockId) return block;
+          return {
+            ...block,
+            props: {
+              ...block.props,
+              columns: block.props.columns.map((column) =>
+                column.id === columnId
+                  ? { ...column, blocks: [...column.blocks, content] }
+                  : column,
+              ),
+            },
+          };
+        });
+
+      return { ...current, blocks, updatedAt: "Just now" };
+    });
+    setSelectedId(blockId);
+  }
+
   function onDragEnd({ active, over }) {
     setActiveDrag(null);
     if (!over) return;
 
-    if (String(active.id).startsWith("new:")) {
-      const type = String(active.id).replace("new:", "");
+    const activeId = String(active.id);
+    const isNewBlock = activeId.startsWith("new:");
+    const draggedType = isNewBlock
+      ? activeId.replace("new:", "")
+      : designRef.current.blocks.find((block) => block.id === active.id)?.type;
+    const dropData = over.data.current;
+
+    if (
+      dropData?.kind === "column" &&
+      dropData.accepts?.includes(draggedType)
+    ) {
+      addContentToColumn({
+        blockId: dropData.blockId,
+        columnId: dropData.columnId,
+        sourceBlockId: isNewBlock ? null : active.id,
+        type: draggedType,
+      });
+      return;
+    }
+
+    if (isNewBlock) {
+      const type = activeId.replace("new:", "");
       const index = design.blocks.findIndex((block) => block.id === over.id);
       addBlock(type, index >= 0 ? index : design.blocks.length);
       return;

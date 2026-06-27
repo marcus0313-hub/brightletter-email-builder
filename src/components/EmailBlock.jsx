@@ -1,3 +1,4 @@
+import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -738,6 +739,34 @@ function ColumnContentPreview({ content, brand, onChange, onDelete, style }) {
   }
 }
 
+function ColumnDropTarget({ blockId, children, columnId, style }) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `column-drop:${blockId}:${columnId}`,
+    data: {
+      accepts: ["image", "button", "divider"],
+      blockId,
+      columnId,
+      kind: "column",
+    },
+  });
+
+  return (
+    <div
+      aria-label="Drop image, button, or divider into this column"
+      className={`content-column ${isOver ? "column-drop-active" : ""}`}
+      ref={setNodeRef}
+      style={style}
+    >
+      {children}
+      {isOver && (
+        <span className="column-drop-indicator">
+          Drop into column
+        </span>
+      )}
+    </div>
+  );
+}
+
 function StaffMemoPreview({ block, brand, style }) {
   const p = block.props;
   const update = (key, value) => block.onPropsChange({ ...p, [key]: value });
@@ -1383,8 +1412,9 @@ function BlockPreview({ block, brand }) {
               }}
             >
               {p.columns.map((column, columnIndex) => (
-                <div
-                  className="content-column"
+                <ColumnDropTarget
+                  blockId={block.id}
+                  columnId={column.id}
                   key={column.id}
                   style={{
                     backgroundColor: s.columnBackgroundColor,
@@ -1434,9 +1464,11 @@ function BlockPreview({ block, brand }) {
                       />
                     ))
                   ) : (
-                    <div className="empty-content-column">Empty column</div>
+                    <div className="empty-content-column">
+                      Drop an image, button, or divider here
+                    </div>
                   )}
-                </div>
+                </ColumnDropTarget>
               ))}
             </div>
           </div>
